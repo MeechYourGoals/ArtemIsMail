@@ -37,7 +37,7 @@ const ReadingPane = () => {
       </div>
 
       {/* Right Rail: Artemis */}
-      <ArtemisPanel decision={selectedEmail.decision} emailId={selectedEmail.id} />
+      <ArtemisPanel decision={selectedEmail.decision} email={selectedEmail} emailId={selectedEmail.id} />
     </div>
   );
 };

@@ -82,6 +82,15 @@ model KnowledgeItem {
   content   String
   type      String   // PDF, DOC, NOTE
   embedding String?  // Store vector as string for SQLite (mock) or use pgvector in prod
+  userId    String?  // Optional: link to User when auth is used
 
   createdAt DateTime @default(now())
+}
+
+model UserSettings {
+  id                 String   @id @default(cuid())
+  userId             String   @unique  // Supabase auth uid
+  customInstructions String?  @default("")  // User's custom AI instructions
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
