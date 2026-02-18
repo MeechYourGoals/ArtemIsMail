@@ -1,8 +1,12 @@
 const OpenAI = require('openai').default;
 
+const lovableGatewayUrl = process.env.LOVABLE_AI_GATEWAY_URL?.trim() || null;
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
+
+// Prefer Lovable gateway (no API key needed); fall back to OpenAI if configured
+const useLovableGateway = !!lovableGatewayUrl;
 
 const SYSTEM_PROMPT = `You are Artemis, an AI assistant that helps prioritize and respond to emails. You analyze emails and provide:
 1. suggestedAction: one of "DRAFT_REPLY" or "ARCHIVE"
@@ -12,11 +16,26 @@ const SYSTEM_PROMPT = `You are Artemis, an AI assistant that helps prioritize an
 
 Be concise and professional. Draft replies should be ready to send with minimal edits.`;
 
-async function analyzeEmailWithAI({ subject, body, from, to, customInstructions, knowledgeContext }) {
-  if (!openai) {
-    return getFallbackDecision(subject, body);
-  }
+async function callLovableGateway(messages) {
+  const url = lovableGatewayUrl.replace(/\/$/, '');
+  // Support full URL or base URL (append OpenAI-compatible path)
+  const endpoint = /\/v1\/chat|completions/.test(url) ? url : `${url}/v1/chat/completions`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages,
+      response_format: { type: 'json_object' },
+      temperature: 0.3
+    })
+  });
+  if (!res.ok) throw new Error(`Lovable gateway: ${res.status} ${res.statusText}`);
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content;
+}
 
+async function analyzeEmailWithAI({ subject, body, from, to, customInstructions, knowledgeContext }) {
   const userContent = [
     `From: ${from}`,
     `To: ${to}`,
@@ -33,18 +52,27 @@ async function analyzeEmailWithAI({ subject, body, from, to, customInstructions,
     systemContent += `\n\nRelevant knowledge base:\n${knowledgeContext}`;
   }
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemContent },
-        { role: 'user', content: userContent }
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.3
-    });
+  const messages = [
+    { role: 'system', content: systemContent },
+    { role: 'user', content: userContent }
+  ];
 
-    const text = completion.choices[0]?.message?.content;
+  try {
+    let text;
+    if (useLovableGateway) {
+      text = await callLovableGateway(messages);
+    } else if (openai) {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages,
+        response_format: { type: 'json_object' },
+        temperature: 0.3
+      });
+      text = completion.choices[0]?.message?.content;
+    } else {
+      return getFallbackDecision(subject, body);
+    }
+
     if (!text) throw new Error('No response from AI');
 
     const parsed = JSON.parse(text);
@@ -55,7 +83,7 @@ async function analyzeEmailWithAI({ subject, body, from, to, customInstructions,
       draftReply: parsed.draftReply || null
     };
   } catch (err) {
-    console.error('OpenAI error:', err);
+    console.error('AI error:', err);
     return getFallbackDecision(subject, body);
   }
 }

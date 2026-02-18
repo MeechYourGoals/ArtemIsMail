@@ -44,8 +44,9 @@ npm run dev
 
 ### 4. AI Analysis
 
-- Without `OPENAI_API_KEY`: uses rule-based fallback (newsletter detection, question detection)
-- With `OPENAI_API_KEY`: uses GPT-4o-mini for full analysis with custom instructions and knowledge base
+- **Lovable gateway** (recommended): Set `LOVABLE_AI_GATEWAY_URL` to your Lovable project's AI gateway URL (from project settings or deployment env). No API key needed when deployed via Lovable.
+- **OpenAI**: Set `OPENAI_API_KEY` for direct OpenAI access (e.g. local dev without Lovable).
+- **Fallback**: If neither is set, uses rule-based analysis (newsletter detection, question detection).
 
 ## API
 
