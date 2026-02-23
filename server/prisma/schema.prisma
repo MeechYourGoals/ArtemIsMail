@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  accessToken   String?
+  refreshToken  String?
+  tokenExpiry   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  emails    Email[]
+  contacts  Contact[]
+}
+
+model Email {
+  id          String   @id @default(cuid())
+  gmailId     String   @unique
+  threadId    String
+  snippet     String
+  subject     String
+  body        String   // Can be large
+  from        String
+  to          String
+  cc          String?
+  bcc         String?
+  date        DateTime
+  isRead      Boolean  @default(false)
+  labels      String   // JSON string or comma-separated
+
+  // Artemis Scoring
+  score       Int      @default(0) // 0-100
+  priority    String   @default("NORMAL") // CRITICAL, IMPORTANT, NORMAL, NOISE
+  signals     String?  // JSON string of signals used for scoring
+
+  // Relations
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  decision    Decision?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Decision {
+  id                String   @id @default(cuid())
+  emailId           String   @unique
+  email             Email    @relation(fields: [emailId], references: [id])
+
+  suggestedAction   String   // DRAFT_REPLY, ARCHIVE, etc.
+  confidence        String   // LOW, MED, HIGH
+  reasoning         String   // Text explanation
+  draftReply        String?  // The drafted text if applicable
+
+  createdAt         DateTime @default(now())
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  email     String
+  name      String?
+  accessToken   String?
+  refreshToken  String?
+  tokenExpiry   DateTime?
+  isVip     Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, email])
+}
+
+model KnowledgeItem {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  type      String   // PDF, DOC, NOTE
+  embedding String?  // Store vector as string for SQLite (mock) or use pgvector in prod
+
+  createdAt DateTime @default(now())
+}
